@@ -2,21 +2,19 @@ using UnityEngine;
 
 public class MouseDrag : MonoBehaviour
 {
-    private Vector2 _vec3Offset; // 鼠标与碎片的偏移量
-    private Vector2 _initPos; // 初始位置
+    [Header("距离阈值")]
+    public float threshold = 0.2f;
+    private Vector3 _initPos; // 初始位置
     private Transform _targetTrans; // 目标物体
 
     public const int Width = 3;
     public const int Height = 3;
-
-    private bool _isMouseDown;
+    
     private Vector3 _lastMousePos = Vector3.zero; // 上一次的鼠标位置
     private float _chipWidth = 1;  // 碎片宽度
     private float _chipHeight = 1; // 碎片高度
-
     private Camera _mainCamera;
-
-    private bool _clickSelect; // 点击选中某个碎片
+    
 
     private void Start()
     {
@@ -25,34 +23,31 @@ public class MouseDrag : MonoBehaviour
 
     private void Update()
     {
+        if (GameOver.gameOver)
+            return;
+        
         Vector3 mousePos = _mainCamera.ScreenToWorldPoint(Input.mousePosition);
         
         if (Input.GetMouseButtonDown(0))
         {
-            _isMouseDown = true;
-            for (int i = 0; i < Height && _clickSelect == false; i++)
+            for (int i = 0; i < Height; i++)
             {
-                for (int j = 0; j < Width && _clickSelect == false; j++)
+                for (int j = 0; j < Width; j++)
                 {
                     Vector3 picPos = CreatePic.picMatrix[i, j].transform.position;
                     if(Mathf.Abs(mousePos.x - picPos.x) < _chipWidth / 2 && Mathf.Abs(mousePos.y - picPos.y) < _chipHeight / 2)
                     {
                         _targetTrans = CreatePic.picMatrix[i, j].transform;
                         _initPos = picPos;
-                        _clickSelect = true;
+                        goto outer;
                     }
                 }
             }
+
+            outer: ;
         }
 
-        if (Input.GetMouseButtonUp(0))
-        {
-            _isMouseDown = false;
-            _lastMousePos = Vector3.zero;
-            _clickSelect = false;
-        }
-
-        if (_isMouseDown)
+        if (Input.GetMouseButton(0) && _targetTrans != null)
         {
             if (_lastMousePos != Vector3.zero)
             {   
@@ -62,5 +57,46 @@ public class MouseDrag : MonoBehaviour
 
             _lastMousePos = mousePos;
         }
+        
+        if (Input.GetMouseButtonUp(0) && _targetTrans != null)
+        {
+            _lastMousePos = Vector3.zero;
+            
+            MatchOrBack();
+        }
+    }
+
+    
+    // 匹配或回归原位
+    private void MatchOrBack()
+    {
+        _targetTrans.GetComponent<SpriteRenderer>().sortingOrder = 5;
+        Vector3 targetPos = _targetTrans.position;
+        
+        for (int i = 0; i < Height; i++)
+        {
+            for (int j = 0; j < Width; j++)
+            {
+                if (_targetTrans.name == CreatePic.picMatrix[i, j].name)
+                {
+                    //print($"OnMyMouseUp: {targetPos}, {j}, {i}");
+                    if(Mathf.Abs(targetPos.x - j) < threshold && Mathf.Abs(targetPos.y - i) < threshold)
+                    {
+                        _targetTrans.position = new Vector3(j, i, 0);
+                        GameOver.matchNum++;
+                        GameOver.Judge();
+                        _targetTrans = null;
+                    }
+                    else
+                    {
+                        _targetTrans.position = _initPos;
+                    }
+                    
+                    goto outer;
+                }
+            }
+        }
+
+        outer: ;
     }
 }
